@@ -7,6 +7,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/james-bowman/sparse"
+	"gonum.org/v1/gonum/mat"
 )
 
 type entry struct {
@@ -19,12 +22,51 @@ func (e entry) String() string {
 	return fmt.Sprintf("{input: '%q', expected matrix: %v", e.str, e.matrix)
 }
 
-func TestParseMatrixMarketArray(t *testing.T) {
-	t.Errorf("Cannot parse array format yet")
-}
-
 func TestParseMatrixMarketCoordinate(t *testing.T) {
-	t.Errorf("Cannot parse coordinate format yet")
+	mm := []byte(`%%MatrixMarket matrix coordinate real general
+% A 5x5 sparse matrix with 8 nonzeros
+5 5 8
+1 1     1.0
+2 2     10.5
+4 2     250.5
+3 3     0.015
+1 4     6.0
+4 4     -280.0
+4 5     33.32
+5 5     12.0`)
+
+	ref := sparse.NewCOO(5, 5, make([]int, 8), make([]int, 8), make([]float64, 8))
+	ref.Set(0, 0, 1.0)
+	ref.Set(1, 1, 10.5)
+	ref.Set(3, 1, 250.5)
+	ref.Set(2, 2, 0.015)
+	ref.Set(0, 3, 6.0)
+	ref.Set(3, 3, -280.0)
+	ref.Set(3, 4, 33.32)
+	ref.Set(4, 4, 12.0)
+
+	matrix := &Matrix{}
+	err := matrix.Parse(bufio.NewReader(bytes.NewBuffer(mm)))
+	if err != nil {
+		t.Errorf("Error in parsing matrix: %v", err)
+	}
+
+	n, m := matrix.Dims()
+	if n != 5 || m != 5 {
+		t.Errorf("Wrong matrix dimensions: (%d, %d), exp: (%d, %d)", n, m, 5, 5)
+	}
+	if matrix.NNZ() != 8 {
+		t.Errorf("Wrong number of NNZ: %d, exp: %d", matrix.NNZ(), 8)
+	}
+
+	if matrix.mat == nil {
+		t.Fatal("Matrix interface is nil after parsing")
+	}
+
+	if !mat.Equal(ref, matrix.mat) {
+		t.Logf("Expected:\n%v\n but created:\n%v\n", mat.Formatted(ref), mat.Formatted(matrix.mat))
+		t.Errorf("Wrong content")
+	}
 }
 
 func TestParseMatrixMarketDimensions(t *testing.T) {
@@ -86,6 +128,18 @@ func TestParseMatrixMarketComment(t *testing.T) {
 			str: []byte("%Hello\n\n\n\n%World!"),
 			matrix: Matrix{
 				comment: "%Hello\n\n\n\n%World!",
+			},
+		},
+		entry{ // some consequetive newlines with spaces
+			str: []byte("%Hello\n    \n\n\n%World!"),
+			matrix: Matrix{
+				comment: "%Hello\n    \n\n\n%World!",
+			},
+		},
+		entry{ // some consequetive newlines with tabs
+			str: []byte("%Hello\n\t\n\n\n%World!"),
+			matrix: Matrix{
+				comment: "%Hello\n\t\n\n\n%World!",
 			},
 		},
 		entry{ // emtpy line

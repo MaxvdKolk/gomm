@@ -11,7 +11,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/james-bowman/sparse"
 	"github.com/jlaffaye/ftp"
+	"gonum.org/v1/gonum/mat"
 )
 
 const marketUrl string = `http://math.nist.gov/MatrixMarket/matrices.html`
@@ -51,7 +53,8 @@ type Matrix struct {
 	Symmetry   string
 	n, m       int
 	nnz        int
-	// mat *Matrix?
+
+	mat mat.Matrix
 }
 
 func NewMatrixMarket() (*MatrixMarket, error) {
@@ -78,6 +81,18 @@ func NewMatrixMarket() (*MatrixMarket, error) {
 		return nil, err
 	}
 	return market, nil
+}
+
+func (matrix *Matrix) Dims() (int, int) {
+	return matrix.n, matrix.m
+}
+
+func (matrix *Matrix) At(i, j int) float64 {
+	return matrix.mat.At(i, j)
+}
+
+func (matrix *Matrix) NNZ() int {
+	return matrix.nnz
 }
 
 func (market *MatrixMarket) Download(m Matrix) error {
@@ -233,7 +248,7 @@ loop:
 		}
 
 		switch b[0] {
-		case '%', '\n':
+		case '%', '\n', ' ', '\t':
 			// consume and store comment and empty lines
 			b, err := buf.ReadBytes('\n')
 			if err != nil {
@@ -283,80 +298,94 @@ func (matrix *Matrix) ParseDimensions(buf *bufio.Reader) error {
 		return err
 	}
 	matrix.nnz = nnz
-
 	return nil
 }
 
-func (matrix *Matrix) Parse() error {
-	path := matrix.Path()
-
-	// preprocessing to get a *io.Reader
-	file, err := os.Open(path)
-	if err != nil {
-		return err
+func (matrix *Matrix) ParseMatrix(buf *bufio.Reader) error {
+	switch matrix.Format {
+	case FormatCoordinate:
+		return matrix.ParseCoordinate(buf)
+	case FormatArray:
+		return fmt.Errorf("not yet available")
+	default:
+		return fmt.Errorf("not supported format %#v", matrix.Format)
 	}
-	defer file.Close()
+}
 
-	//var buf *bufio.Reader
+func splitTriplet(s string) (i int, j int, v float64, err error) {
+	splits := strings.Fields(strings.TrimSpace(s))
+	if len(splits) != 3 {
+		return i, j, v, fmt.Errorf("Too little entries to unpack triplet %d, %s", len(splits), splits)
+	}
 
-	//	if filepath.Ext(path) == ".gz" {
-	//		unzip, err := gzip.NewReader(file)
-	//		if err != nil {
-	//			defer file.Close()
-	//		}
-	//		buf = bufio.NewReader(unzip)
-	//	} else {
-	//		buf = bufio.NewReader(file)
-	//	}
-	//
-	// consume all empty or comment lines
-	// TODO: maybe store as general description
-	/*
-		line := string(b)
-		for {
-			if len(strings.TrimSpace(line)) != 0 {
-				if line[0] != '%' {
-					break
-				}
-			}
-			line, err = buf.ReadString('\n')
-			if err != nil {
-				return err
-			}
+	i, err = strconv.Atoi(splits[0])
+	if err != nil {
+		return i, j, v, err
+	}
+
+	j, err = strconv.Atoi(splits[1])
+	if err != nil {
+		return i, j, v, err
+	}
+
+	v, err = strconv.ParseFloat(splits[2], 64)
+	if err != nil {
+		return i, j, v, err
+	}
+
+	return i, j, v, nil
+}
+
+func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
+	// fill COO
+	n, m := matrix.Dims()
+	if n == 0 || m == 0 {
+		return fmt.Errorf("Matrix dimensions are emtpy (%d, %d)", n, m)
+	}
+	nnz := matrix.NNZ()
+	I, J, V := make([]int, 0, nnz), make([]int, 0, nnz), make([]float64, 0, nnz)
+	coo := sparse.NewCOO(n, m, I, J, V)
+
+	// exhaust all lines with scanner
+	scanner := bufio.NewScanner(buf)
+	for scanner.Scan() {
+		i, j, v, err := splitTriplet(scanner.Text())
+		if err != nil {
+			return err
 		}
 
-		// matrix dimensions and number of entries
-		log.Println(line)
+		// correct for one-base
+		coo.Set(i-1, j-1, v)
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
 
-	*/
-	//b, err := buf.ReadBytes('\n')
-	//if err != nil {
-	//	return err
-	//}
+	// return CSR
+	matrix.mat = coo.ToCSR()
+	return nil
+}
 
-	// actual processing of the file
-	//for scanner.Scan() {
-	//	log.Println(scanner.Text())
-	//}
-	//if err := scanner.Err(); err != nil {
-	//	return err
-	//}
+func (matrix *Matrix) Parse(buf *bufio.Reader) error {
 
-	return fmt.Errorf("%s", matrix)
+	if err := matrix.ParseHeader(buf); err != nil {
+		return err
+	}
 
-	//gunzip, err := gzip.NewReader(resp.Body)
-	//if err != nil {
-	//	return err
-	//}
+	if err := matrix.ParseComment(buf); err != nil {
+		return err
+	}
 
-	//// ftp://math.nist.gov/pub/MatrixMarket2/Harwell-Boeing/bcsstruc2/bcsstk14.mtx.gz
+	if err := matrix.ParseDimensions(buf); err != nil {
+		return err
+	}
 
-	//scanner := bufio.NewScanner(gunzip)
-	//log.Printf("Contents of %+v\n", m)
-	//for scanner.Scan() {
-	//	log.Println(scanner.Text())
-	//}
-	//if err := scanner.Err(); err != nil {
-	//	return err
-	//}
+	// it is expected to exhaust the reader till EOF
+	err := matrix.ParseMatrix(buf)
+	if err != nil {
+		if err != io.EOF {
+			return err
+		}
+	}
+	return nil
 }
