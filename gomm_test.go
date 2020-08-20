@@ -23,6 +23,16 @@ func (e entry) String() string {
 }
 
 func TestParseMatrixMarketCoordinate(t *testing.T) {
+
+	/*
+		This requires the following extensions:
+		- integer, complex, pattern style matrices;
+		  export all simply as float
+		- support symmetric / skew-symmetric, perform post operations
+		- export array format to dense matrices
+		- ensure the output is always a Matrix
+	*/
+
 	mm := []byte(`%%MatrixMarket matrix coordinate real general
 % A 5x5 sparse matrix with 8 nonzeros
 5 5 8
@@ -46,7 +56,7 @@ func TestParseMatrixMarketCoordinate(t *testing.T) {
 	ref.Set(4, 4, 12.0)
 
 	matrix := &Matrix{}
-	err := matrix.Parse(bufio.NewReader(bytes.NewBuffer(mm)))
+	smat, err := matrix.Parse(bufio.NewReader(bytes.NewBuffer(mm)))
 	if err != nil {
 		t.Errorf("Error in parsing matrix: %v", err)
 	}
@@ -66,6 +76,11 @@ func TestParseMatrixMarketCoordinate(t *testing.T) {
 	if !mat.Equal(ref, matrix.mat) {
 		t.Logf("Expected:\n%v\n but created:\n%v\n", mat.Formatted(ref), mat.Formatted(matrix.mat))
 		t.Errorf("Wrong content")
+	}
+
+	csr, ok := smat.(*sparse.CSR)
+	if !ok {
+		t.Errorf("Failed conversion matrix interface to expected type %T, from %T", csr, smat)
 	}
 }
 

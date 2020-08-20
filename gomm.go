@@ -366,26 +366,26 @@ func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 	return nil
 }
 
-func (matrix *Matrix) Parse(buf *bufio.Reader) error {
+func (matrix *Matrix) Parse(buf *bufio.Reader) (mat.Matrix, error) {
 
 	if err := matrix.ParseHeader(buf); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := matrix.ParseComment(buf); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := matrix.ParseDimensions(buf); err != nil {
-		return err
+		return nil, err
 	}
 
 	// it is expected to exhaust the reader till EOF
 	err := matrix.ParseMatrix(buf)
 	if err != nil {
 		if err != io.EOF {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return matrix.mat, nil
 }
