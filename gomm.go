@@ -366,7 +366,8 @@ func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 	return nil
 }
 
-func (matrix *Matrix) Parse(buf *bufio.Reader) (mat.Matrix, error) {
+func (matrix *Matrix) Parse(rd io.Reader) (mat.Matrix, error) {
+	buf := bufio.NewReader(rd)
 
 	if err := matrix.ParseHeader(buf); err != nil {
 		return nil, err
