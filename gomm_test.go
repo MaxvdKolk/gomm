@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"os"
 	"strings"
@@ -23,6 +24,16 @@ func (e entry) String() string {
 }
 
 func TestParseMatrixMarketCoordinate(t *testing.T) {
+
+	/*
+		This requires the following extensions:
+		- integer, complex, pattern style matrices;
+		  export all simply as float
+		- support symmetric / skew-symmetric, perform post operations
+		- export array format to dense matrices
+		- ensure the output is always a Matrix
+	*/
+
 	mm := []byte(`%%MatrixMarket matrix coordinate real general
 % A 5x5 sparse matrix with 8 nonzeros
 5 5 8
@@ -46,7 +57,7 @@ func TestParseMatrixMarketCoordinate(t *testing.T) {
 	ref.Set(4, 4, 12.0)
 
 	matrix := &Matrix{}
-	err := matrix.Parse(bufio.NewReader(bytes.NewBuffer(mm)))
+	smat, err := matrix.Parse(bufio.NewReader(bytes.NewBuffer(mm)))
 	if err != nil {
 		t.Errorf("Error in parsing matrix: %v", err)
 	}
@@ -66,6 +77,11 @@ func TestParseMatrixMarketCoordinate(t *testing.T) {
 	if !mat.Equal(ref, matrix.mat) {
 		t.Logf("Expected:\n%v\n but created:\n%v\n", mat.Formatted(ref), mat.Formatted(matrix.mat))
 		t.Errorf("Wrong content")
+	}
+
+	csr, ok := smat.(*sparse.CSR)
+	if !ok {
+		t.Errorf("Failed conversion matrix interface to expected type %T, from %T", csr, smat)
 	}
 }
 
@@ -252,13 +268,23 @@ func TestParseMatrixMarketHeader(t *testing.T) {
 	}
 }
 
-/* TODO: add as soon as the components are working
+// Complete parse: download, unzip, parse, verify.
 func TestParseMatrixMarketFormat(t *testing.T) {
-	matrices := []Matrix{
-		Matrix{ // real unsymmetric
-			collection: "Harwell-Boeing",
-			set:        "nnceng",
-			name:       "hor__131",
+	type RefMatrix struct {
+		Matrix
+		n, m int
+		nnz  int
+	}
+
+	// selection of test matrices
+	matrices := []RefMatrix{
+		RefMatrix{ // coordinate real unsymmetric
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "nnceng",
+				name:       "hor__131",
+			},
+			434, 434, 4710,
 		},
 		// pattern style -- do later
 		//matrix := Matrix{
@@ -276,12 +302,41 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			}
 		}
 
-		if err := matrix.Parse(); err != nil {
+		f, err := os.Open(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+
+		rd, err := gzip.NewReader(f)
+		if err != nil {
+			t.Errorf("Failed to read gzipped matrix: %v", err)
+		}
+
+		mm, err := matrix.Parse(rd)
+		if err != nil {
+			t.Error(err)
+		}
+
+		csr, ok := mm.(*sparse.CSR)
+		if !ok {
+			t.Errorf("Failed conversion %T, from %T", csr, mm)
+		}
+
+		n, m := mm.Dims()
+		if n != matrix.n || m != matrix.m {
+			t.Errorf("Wrong dimensions: exp: (%v, %v), got: (%v, %v)", matrix.n, matrix.m, n, m)
+		}
+
+		if csr.NNZ() != matrix.nnz {
+			t.Errorf("Wrong number of non-zero entries: exp %v, got %v", matrix.nnz, csr.NNZ())
+		}
+
+		if err := os.Remove(file); err != nil {
 			t.Error(err)
 		}
 	}
 }
-*/
 
 func TestDownloadMatrix(t *testing.T) {
 	matrix := Matrix{
