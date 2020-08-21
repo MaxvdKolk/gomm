@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
 	"fmt"
 	"os"
 	"strings"
@@ -295,27 +294,16 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 	}
 
 	for _, matrix := range matrices {
-		file := fmt.Sprintf("%s.mtx.gz", matrix.name)
+		file := matrix.Filename()
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			if err := matrix.Download(); err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		f, err := os.Open(file)
+		mm, err := GetMatrix(matrix.collection, matrix.set, matrix.name)
 		if err != nil {
 			t.Fatal(err)
-		}
-		defer f.Close()
-
-		rd, err := gzip.NewReader(f)
-		if err != nil {
-			t.Errorf("Failed to read gzipped matrix: %v", err)
-		}
-
-		mm, err := matrix.Parse(rd)
-		if err != nil {
-			t.Error(err)
 		}
 
 		csr, ok := mm.(*sparse.CSR)
@@ -348,10 +336,10 @@ func TestDownloadMatrix(t *testing.T) {
 	if err := matrix.Download(); err != nil {
 		t.Error(err)
 	}
-	if _, err := os.Stat(fmt.Sprintf("%s.mtx.gz", matrix.name)); os.IsNotExist(err) {
+	if _, err := os.Stat(matrix.Filename()); os.IsNotExist(err) {
 		t.Error(err)
 	}
-	if err := os.Remove(fmt.Sprintf("%s.mtx.gz", matrix.name)); err != nil {
+	if err := os.Remove(matrix.Filename()); err != nil {
 		t.Error(err)
 	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"log"
@@ -57,6 +58,31 @@ type Matrix struct {
 	mat mat.Matrix
 }
 
+func GetMatrix(collection, set, name string) (mat.Matrix, error) {
+	matrix := NewMatrix(collection, set, name)
+	if err := matrix.Download(); err != nil {
+		return nil, err
+	}
+
+	f, err := os.Open(matrix.Filename())
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	rd, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+
+	mat, err := matrix.Parse(rd)
+	if err != nil {
+		return nil, err
+	}
+
+	return mat, nil
+}
+
 func NewMatrixMarket() (*MatrixMarket, error) {
 	list, err := GetMatrixMarket()
 	if err != nil {
@@ -83,6 +109,10 @@ func NewMatrixMarket() (*MatrixMarket, error) {
 	return market, nil
 }
 
+func NewMatrix(collection, set, name string) Matrix {
+	return Matrix{collection: collection, set: set, name: name}
+}
+
 func (matrix *Matrix) Dims() (int, int) {
 	return matrix.n, matrix.m
 }
@@ -93,6 +123,10 @@ func (matrix *Matrix) At(i, j int) float64 {
 
 func (matrix *Matrix) NNZ() int {
 	return matrix.nnz
+}
+
+func (matrix *Matrix) Filename() string {
+	return fmt.Sprintf("%s.mtx.gz", matrix.name)
 }
 
 func (market *MatrixMarket) Download(m Matrix) error {
