@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
 	"fmt"
 	"os"
 	"strings"
@@ -66,8 +65,8 @@ func TestParseMatrixMarketCoordinate(t *testing.T) {
 	if n != 5 || m != 5 {
 		t.Errorf("Wrong matrix dimensions: (%d, %d), exp: (%d, %d)", n, m, 5, 5)
 	}
-	if matrix.NNZ() != 8 {
-		t.Errorf("Wrong number of NNZ: %d, exp: %d", matrix.NNZ(), 8)
+	if matrix.lines != 8 {
+		t.Errorf("Wrong number of lines parsed: %d, exp: %d", matrix.NNZ(), 8)
 	}
 
 	if matrix.mat == nil {
@@ -90,9 +89,9 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 		entry{ // valid
 			str: []byte("5 6 7\n"),
 			matrix: Matrix{
-				n:   5,
-				m:   6,
-				nnz: 7,
+				n:     5,
+				m:     6,
+				lines: 7,
 			},
 		},
 		entry{ // invalid
@@ -120,8 +119,8 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 		if matrix.m != entry.matrix.m {
 			t.Errorf("Wrong second dimension: got %d, exp %d", matrix.m, entry.matrix.m)
 		}
-		if matrix.nnz != entry.matrix.nnz {
-			t.Errorf("Wrong NNZ: got %d, exp %d", matrix.nnz, entry.matrix.nnz)
+		if matrix.lines != entry.matrix.lines {
+			t.Errorf("Wrong number of lines parsed: got %d, exp %d", matrix.nnz, entry.matrix.nnz)
 		}
 	}
 }
@@ -281,41 +280,82 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 		RefMatrix{ // coordinate real unsymmetric
 			Matrix{
 				collection: "Harwell-Boeing",
+				set:        "lns",
+				name:       "lns__131",
+			},
+			131, 131, 536,
+		},
+		RefMatrix{ // coordinate real unsymmetric with explicit zeros
+			Matrix{
+				collection: "Harwell-Boeing",
 				set:        "nnceng",
 				name:       "hor__131",
 			},
-			434, 434, 4710,
+			434, 434, 4182,
 		},
-		// pattern style -- do later
-		//matrix := Matrix{
-		//	collection: "Harwell-Boeing",
-		//	set:        "smtape",
-		//	name:       "ibm32",
-		//}
+		RefMatrix{ // coordinate real symmetric positive definite
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "bcsstruc1",
+				name:       "bcsstk01",
+			},
+			48, 48, 400,
+		},
+		RefMatrix{ // coordinate real skew-symmetric
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "platz",
+				name:       "plsk1919",
+			},
+			1919, 1919, 9662,
+		},
+		RefMatrix{ // coordinate real unsymmetric, more dense
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "astroph",
+				name:       "mcca",
+			},
+			180, 180, 2659,
+		},
+		RefMatrix{ // coordinate real unsymmetric, nrows > ncols
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "lsq",
+				name:       "illc1033",
+			},
+			1033, 320, 4719,
+		},
+		RefMatrix{ // coordinate real unsymmetric, ncols > nrows
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "econiea",
+				name:       "wm1",
+			},
+			207, 277, 2909,
+		},
+		RefMatrix{ // coordinate real unsymmetric, ncols > nrows, almost dense
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "econiea",
+				name:       "beause",
+			},
+			497, 507, 44551,
+		},
+		// TODO: pattern style tests
 	}
 
 	for _, matrix := range matrices {
-		file := fmt.Sprintf("%s.mtx.gz", matrix.name)
+		file := matrix.Filename()
+		t.Logf("Processing: %v", matrix.Filename())
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			if err := matrix.Download(); err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		f, err := os.Open(file)
+		mm, err := GetMatrix(matrix.collection, matrix.set, matrix.name)
 		if err != nil {
 			t.Fatal(err)
-		}
-		defer f.Close()
-
-		rd, err := gzip.NewReader(f)
-		if err != nil {
-			t.Errorf("Failed to read gzipped matrix: %v", err)
-		}
-
-		mm, err := matrix.Parse(rd)
-		if err != nil {
-			t.Error(err)
 		}
 
 		csr, ok := mm.(*sparse.CSR)
@@ -348,10 +388,10 @@ func TestDownloadMatrix(t *testing.T) {
 	if err := matrix.Download(); err != nil {
 		t.Error(err)
 	}
-	if _, err := os.Stat(fmt.Sprintf("%s.mtx.gz", matrix.name)); os.IsNotExist(err) {
+	if _, err := os.Stat(matrix.Filename()); os.IsNotExist(err) {
 		t.Error(err)
 	}
-	if err := os.Remove(fmt.Sprintf("%s.mtx.gz", matrix.name)); err != nil {
+	if err := os.Remove(matrix.Filename()); err != nil {
 		t.Error(err)
 	}
 }
