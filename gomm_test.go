@@ -65,8 +65,8 @@ func TestParseMatrixMarketCoordinate(t *testing.T) {
 	if n != 5 || m != 5 {
 		t.Errorf("Wrong matrix dimensions: (%d, %d), exp: (%d, %d)", n, m, 5, 5)
 	}
-	if matrix.NNZ() != 8 {
-		t.Errorf("Wrong number of NNZ: %d, exp: %d", matrix.NNZ(), 8)
+	if matrix.lines != 8 {
+		t.Errorf("Wrong number of lines parsed: %d, exp: %d", matrix.NNZ(), 8)
 	}
 
 	if matrix.mat == nil {
@@ -89,9 +89,9 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 		entry{ // valid
 			str: []byte("5 6 7\n"),
 			matrix: Matrix{
-				n:   5,
-				m:   6,
-				nnz: 7,
+				n:     5,
+				m:     6,
+				lines: 7,
 			},
 		},
 		entry{ // invalid
@@ -119,8 +119,8 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 		if matrix.m != entry.matrix.m {
 			t.Errorf("Wrong second dimension: got %d, exp %d", matrix.m, entry.matrix.m)
 		}
-		if matrix.nnz != entry.matrix.nnz {
-			t.Errorf("Wrong NNZ: got %d, exp %d", matrix.nnz, entry.matrix.nnz)
+		if matrix.lines != entry.matrix.lines {
+			t.Errorf("Wrong number of lines parsed: got %d, exp %d", matrix.nnz, entry.matrix.nnz)
 		}
 	}
 }
