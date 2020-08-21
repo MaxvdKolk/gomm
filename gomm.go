@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -54,6 +55,7 @@ type Matrix struct {
 	Symmetry   string
 	n, m       int
 	nnz        int
+	lines      int
 
 	mat mat.Matrix
 }
@@ -302,8 +304,7 @@ loop:
 	return nil
 }
 
-// ParseDimensions parses the dimensions and expected number of non-zero
-// entries (nnz).
+// ParseDimensions parses the dimensions and expected number of lines.
 func (matrix *Matrix) ParseDimensions(buf *bufio.Reader) error {
 	line, err := buf.ReadString('\n')
 	if err != nil {
@@ -312,7 +313,7 @@ func (matrix *Matrix) ParseDimensions(buf *bufio.Reader) error {
 
 	dims := strings.Split(strings.TrimSpace(line), " ")
 	if len(dims) != 3 {
-		return fmt.Errorf("Expect three values: (n, m, nnz), got: %v", dims)
+		return fmt.Errorf("Expect three values: (n, m, lines), got: %v", dims)
 	}
 
 	n, err := strconv.Atoi(dims[0])
@@ -327,11 +328,11 @@ func (matrix *Matrix) ParseDimensions(buf *bufio.Reader) error {
 	}
 	matrix.m = m
 
-	nnz, err := strconv.Atoi(dims[2])
+	lines, err := strconv.Atoi(dims[2])
 	if err != nil {
 		return err
 	}
-	matrix.nnz = nnz
+	matrix.lines = lines
 	return nil
 }
 
@@ -376,7 +377,9 @@ func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 	if n == 0 || m == 0 {
 		return fmt.Errorf("Matrix dimensions are emtpy (%d, %d)", n, m)
 	}
-	nnz := matrix.NNZ()
+
+	// estimate number of non-zeros by number of lines in file
+	nnz := matrix.lines
 	I, J, V := make([]int, 0, nnz), make([]int, 0, nnz), make([]float64, 0, nnz)
 	coo := sparse.NewCOO(n, m, I, J, V)
 
@@ -388,8 +391,24 @@ func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 			return err
 		}
 
+		// prevent inserting explicit zeros
+		// FIXME: not sure if `SmallestNonzeroFloat64` makes sense
+		if math.Abs(v) < math.SmallestNonzeroFloat64 {
+			continue
+		}
+
 		// correct for one-base
 		coo.Set(i-1, j-1, v)
+
+		// for symmetric types also insert its symmetric counterpart
+		if i != j {
+			switch matrix.Symmetry {
+			case Symmetric:
+				coo.Set(j-1, i-1, v)
+			case SkewSymmetric:
+				coo.Set(j-1, i-1, -v)
+			}
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return err

@@ -280,21 +280,73 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 		RefMatrix{ // coordinate real unsymmetric
 			Matrix{
 				collection: "Harwell-Boeing",
+				set:        "lns",
+				name:       "lns__131",
+			},
+			131, 131, 536,
+		},
+		RefMatrix{ // coordinate real unsymmetric with explicit zeros
+			Matrix{
+				collection: "Harwell-Boeing",
 				set:        "nnceng",
 				name:       "hor__131",
 			},
-			434, 434, 4710,
+			434, 434, 4182,
 		},
-		// pattern style -- do later
-		//matrix := Matrix{
-		//	collection: "Harwell-Boeing",
-		//	set:        "smtape",
-		//	name:       "ibm32",
-		//}
+		RefMatrix{ // coordinate real symmetric positive definite
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "bcsstruc1",
+				name:       "bcsstk01",
+			},
+			48, 48, 400,
+		},
+		RefMatrix{ // coordinate real skew-symmetric
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "platz",
+				name:       "plsk1919",
+			},
+			1919, 1919, 9662,
+		},
+		RefMatrix{ // coordinate real unsymmetric, more dense
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "astroph",
+				name:       "mcca",
+			},
+			180, 180, 2659,
+		},
+		RefMatrix{ // coordinate real unsymmetric, nrows > ncols
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "lsq",
+				name:       "illc1033",
+			},
+			1033, 320, 4719,
+		},
+		RefMatrix{ // coordinate real unsymmetric, ncols > nrows
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "econiea",
+				name:       "wm1",
+			},
+			207, 277, 2909,
+		},
+		RefMatrix{ // coordinate real unsymmetric, ncols > nrows, almost dense
+			Matrix{
+				collection: "Harwell-Boeing",
+				set:        "econiea",
+				name:       "beause",
+			},
+			497, 507, 44551,
+		},
+		// TODO: pattern style tests
 	}
 
 	for _, matrix := range matrices {
 		file := matrix.Filename()
+		t.Logf("Processing: %v", matrix.Filename())
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			if err := matrix.Download(); err != nil {
 				t.Fatal(err)
