@@ -312,8 +312,8 @@ func (matrix *Matrix) ParseDimensions(buf *bufio.Reader) error {
 	}
 
 	dims := strings.Split(strings.TrimSpace(line), " ")
-	if len(dims) != 3 {
-		return fmt.Errorf("Expect three values: (n, m, lines), got: %v", dims)
+	if len(dims) < 2 {
+		return fmt.Errorf("Expect at least two values: (n, m, _), got: %v", dims)
 	}
 
 	n, err := strconv.Atoi(dims[0])
@@ -328,6 +328,18 @@ func (matrix *Matrix) ParseDimensions(buf *bufio.Reader) error {
 	}
 	matrix.m = m
 
+	// `FormatArray` is dense, thus the number of lines is already known
+	if matrix.Format == FormatArray {
+		matrix.lines = matrix.n * matrix.m
+		return nil
+	}
+
+	// For other formats the matrix entries might overlap, e.g. the COO
+	// triplets are to be summed, or only a subset of symmetric matrices
+	// are provided. Thus the number of expected lines is parsed.
+	if len(dims) < 3 {
+		return fmt.Errorf("Expect at least three values: (n, m, v), got: %v", dims)
+	}
 	lines, err := strconv.Atoi(dims[2])
 	if err != nil {
 		return err
@@ -341,7 +353,7 @@ func (matrix *Matrix) ParseMatrix(buf *bufio.Reader) error {
 	case FormatCoordinate:
 		return matrix.ParseCoordinate(buf)
 	case FormatArray:
-		return fmt.Errorf("not yet available")
+		return matrix.ParseArrayFormat(buf)
 	default:
 		return fmt.Errorf("not supported format %#v", matrix.Format)
 	}
@@ -419,6 +431,42 @@ func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 	return nil
 }
 
+func (matrix *Matrix) ParseArrayFormat(buf *bufio.Reader) error {
+	// prepare dense matrix
+	n, m := matrix.Dims()
+	if n == 0 || m == 0 {
+		return fmt.Errorf("Matrix dimensions are emtpy (%d, %d)", n, m)
+	}
+
+	//mat := mat.NewDense(n, m, nil)
+	values := make([]float64, n*m)
+
+	// exhaust all lines with scanner
+	scanner := bufio.NewScanner(buf)
+	cnt := 0
+	for scanner.Scan() {
+		v, err := strconv.ParseFloat(strings.TrimSpace(scanner.Text()), 64)
+		if err != nil {
+			return err
+		}
+
+		values[cnt] = v
+		cnt++
+	}
+
+	// Construct a dense matrix where the extracted values are put in the
+	// right order, as the ordering of `MatrixMarket` is column-major,
+	// whereas `mat.NewDense` would assume row-major.
+	mm := mat.NewDense(n, m, nil)
+	for c := 0; c < m; c++ {
+		for r := 0; r < n; r++ {
+			mm.Set(r, c, values[c*n+r])
+		}
+	}
+	matrix.mat = mm
+	return nil
+}
+
 func (matrix *Matrix) Parse(rd io.Reader) (mat.Matrix, error) {
 	buf := bufio.NewReader(rd)
 
@@ -473,6 +521,24 @@ func SaveToMatrixMarket(matrix mat.Matrix, wr io.Writer) error {
 		}
 		csr.DoNonZero(writeNonZero)
 
+		return buf.Flush()
+	}
+
+	// dense variant
+	dense, ok := matrix.(*mat.Dense)
+	if ok {
+		header := fmt.Sprintf("%%%%MatrixMarket matrix %s %s %s\n", FormatArray, TypeReal, General)
+		buf.WriteString(header)
+
+		// Matrix dimensions and number of lines of output
+		n, m := dense.Dims()
+		buf.WriteString(fmt.Sprintf("%d %d\n", n, m))
+
+		for c := 0; c < m; c++ {
+			for r := 0; r < n; r++ {
+				buf.WriteString(fmt.Sprintf("%v\n", dense.At(r, c)))
+			}
+		}
 		return buf.Flush()
 	}
 

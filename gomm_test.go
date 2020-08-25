@@ -23,6 +23,61 @@ func (e entry) String() string {
 	return fmt.Sprintf("{input: '%q', expected matrix: %v", e.str, e.matrix)
 }
 
+func TestParsMatrixMarketArrayFormat(t *testing.T) {
+	mm := []byte(`%%MatrixMarket matrix array real general
+4 3
+1.0
+2.0
+3.0
+4.0
+5.0
+6.0
+7.0
+8.0
+9.0
+10.0
+11.0
+12.0`)
+
+	ref := mat.NewDense(4, 3, nil)
+	cnt := 1.0
+	for c := 0; c < 3; c++ {
+		for r := 0; r < 4; r++ {
+			ref.Set(r, c, cnt)
+			cnt += 1.0
+		}
+	}
+
+	matrix := &Matrix{}
+	smat, err := matrix.Parse(bufio.NewReader(bytes.NewBuffer(mm)))
+	if err != nil {
+		t.Errorf("Error in parsing matrix: %v", err)
+	}
+
+	n, m := matrix.Dims()
+	if n != 4 || m != 3 {
+		t.Errorf("Wrong matrix dimensions: (%d, %d), exp: (%d, %d)", n, m, 5, 5)
+	}
+	if matrix.lines != 12 {
+		t.Errorf("Wrong number of lines parsed: %d, exp: %d", matrix.lines, 12)
+	}
+
+	if matrix.mat == nil {
+		t.Fatal("Matrix interface is nil after parsing")
+	}
+
+	if !mat.Equal(ref, matrix.mat) {
+		t.Logf("Expected:\n%v\n but created:\n%v\n", mat.Formatted(ref), mat.Formatted(matrix.mat))
+		t.Errorf("Wrong content")
+	}
+
+	dense, ok := smat.(*mat.Dense)
+	if !ok {
+		t.Errorf("Failed conversion matrix interface to expected type %T, from %T", dense, smat)
+	}
+
+}
+
 func TestParseMatrixMarketCoordinate(t *testing.T) {
 
 	/*
@@ -90,19 +145,42 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 		entry{ // valid
 			str: []byte("5 6 7\n"),
 			matrix: Matrix{
-				n:     5,
-				m:     6,
-				lines: 7,
+				n:      5,
+				m:      6,
+				lines:  7,
+				Format: FormatCoordinate,
 			},
 		},
 		entry{ // invalid
 			str: []byte("5 6\n"),
 			err: true,
+			matrix: Matrix{
+				n:      5,
+				m:      6,
+				Format: FormatCoordinate,
+			},
+		},
+		entry{ // valid for `FormatArray`
+			str: []byte("5 6\n"),
+			matrix: Matrix{
+				n:      5,
+				m:      6,
+				lines:  30,
+				Format: FormatArray,
+			},
+		},
+		entry{ // invalid for `FormatArray`
+			str: []byte("5\n"),
+			err: true,
+			matrix: Matrix{
+				Format: FormatArray,
+			},
 		},
 	}
 
 	for _, entry := range entries {
 		matrix := &Matrix{}
+		matrix.Format = entry.matrix.Format
 		err := matrix.ParseDimensions(bufio.NewReader(bytes.NewBuffer(entry.str)))
 
 		if entry.err {
@@ -504,6 +582,81 @@ func TestWriteMatrixMarketFormat(t *testing.T) {
 		b1 := make([]byte, 64000)
 		_, err1 := refReader.Read(b1)
 		b2 := make([]byte, 64000)
+		_, err2 := matReader.Read(b2)
+
+		if err1 != nil || err2 != nil {
+			if err1 == io.EOF && err2 == io.EOF {
+				// end of files
+				break
+			} else {
+				t.Logf("error: buffer 1: %v, buffer 2: %v", err1, err2)
+			}
+		}
+
+		if !bytes.Equal(b1, b2) {
+			t.Logf("Reference bytes: %v", b1)
+			t.Logf("Custom bytes: %v", b2)
+			t.Errorf("bytes are not equal")
+		}
+	}
+
+	if err := os.Remove("test_write.mtx"); err != nil {
+		t.Error(err)
+	}
+}
+
+// FIXME: combine with test writing of coordinate format
+func TestWriteMatrixMarketFormatDense(t *testing.T) {
+	mm := []byte(`%%MatrixMarket matrix array real general
+4 3
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+`)
+
+	ref := mat.NewDense(4, 3, nil)
+	cnt := 1.0
+	for c := 0; c < 3; c++ {
+		for r := 0; r < 4; r++ {
+			ref.Set(r, c, cnt)
+			cnt += 1.0
+		}
+	}
+
+	// create test file
+	f, err := os.Create("test_write.mtx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	// populate with matrix
+	err = SaveToMatrixMarket(ref, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// compare both streams byte wise
+	refReader := bufio.NewReader(bytes.NewBuffer(mm))
+	matReader, err := os.Open("test_write.mtx")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// FIXME: might be much for this simple test
+	for {
+		b1 := make([]byte, 640)
+		_, err1 := refReader.Read(b1)
+		b2 := make([]byte, 640)
 		_, err2 := matReader.Read(b2)
 
 		if err1 != nil || err2 != nil {
