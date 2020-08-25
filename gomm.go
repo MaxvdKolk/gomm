@@ -524,6 +524,24 @@ func SaveToMatrixMarket(matrix mat.Matrix, wr io.Writer) error {
 		return buf.Flush()
 	}
 
+	// dense variant
+	dense, ok := matrix.(*mat.Dense)
+	if ok {
+		header := fmt.Sprintf("%%%%MatrixMarket matrix %s %s %s\n", FormatArray, TypeReal, General)
+		buf.WriteString(header)
+
+		// Matrix dimensions and number of lines of output
+		n, m := dense.Dims()
+		buf.WriteString(fmt.Sprintf("%d %d\n", n, m))
+
+		for c := 0; c < m; c++ {
+			for r := 0; r < n; r++ {
+				buf.WriteString(fmt.Sprintf("%v\n", dense.At(r, c)))
+			}
+		}
+		return buf.Flush()
+	}
+
 	// support dense variant later
 	return fmt.Errorf("No output support yet for dense matrices.")
 }

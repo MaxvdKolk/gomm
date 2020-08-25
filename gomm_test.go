@@ -604,3 +604,78 @@ func TestWriteMatrixMarketFormat(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// FIXME: combine with test writing of coordinate format
+func TestWriteMatrixMarketFormatDense(t *testing.T) {
+	mm := []byte(`%%MatrixMarket matrix array real general
+4 3
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+`)
+
+	ref := mat.NewDense(4, 3, nil)
+	cnt := 1.0
+	for c := 0; c < 3; c++ {
+		for r := 0; r < 4; r++ {
+			ref.Set(r, c, cnt)
+			cnt += 1.0
+		}
+	}
+
+	// create test file
+	f, err := os.Create("test_write.mtx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	// populate with matrix
+	err = SaveToMatrixMarket(ref, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// compare both streams byte wise
+	refReader := bufio.NewReader(bytes.NewBuffer(mm))
+	matReader, err := os.Open("test_write.mtx")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// FIXME: might be much for this simple test
+	for {
+		b1 := make([]byte, 640)
+		_, err1 := refReader.Read(b1)
+		b2 := make([]byte, 640)
+		_, err2 := matReader.Read(b2)
+
+		if err1 != nil || err2 != nil {
+			if err1 == io.EOF && err2 == io.EOF {
+				// end of files
+				break
+			} else {
+				t.Logf("error: buffer 1: %v, buffer 2: %v", err1, err2)
+			}
+		}
+
+		if !bytes.Equal(b1, b2) {
+			t.Logf("Reference bytes: %v", b1)
+			t.Logf("Custom bytes: %v", b2)
+			t.Errorf("bytes are not equal")
+		}
+	}
+
+	if err := os.Remove("test_write.mtx"); err != nil {
+		t.Error(err)
+	}
+}
