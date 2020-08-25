@@ -443,3 +443,39 @@ func (matrix *Matrix) Parse(rd io.Reader) (mat.Matrix, error) {
 	}
 	return matrix.mat, nil
 }
+
+// SaveToMatrixMarket writes a `mat.Matrix` interface towards the `MatrixMarket`
+// format. Currently, all matrices are written as `coordinate real general`
+// types.
+//
+// TODO: support (skew)symmetric outputs
+// TODO: support dense matrix outputs
+func SaveToMatrixMarket(matrix mat.Matrix, wr io.Writer) error {
+	// bufferend output
+	buf := bufio.NewWriter(wr)
+
+	// sparse variant
+	csr, ok := matrix.(*sparse.CSR)
+	if ok {
+		// MatrixMarket header
+		header := fmt.Sprintf("%%%%MatrixMarket matrix %s %s %s\n", FormatCoordinate, TypeReal, General)
+		buf.WriteString(header)
+
+		// Matrix dimensions and number of lines of output
+		n, m := csr.Dims()
+		nnz := csr.NNZ()
+		buf.WriteString(fmt.Sprintf("%d %d %d\n", n, m, nnz))
+
+		// Apply write function to each non-zero
+		writeNonZero := func(i, j int, v float64) {
+			// Correct for one-base
+			buf.WriteString(fmt.Sprintf("%d %d %v\n", i+1, j+1, v))
+		}
+		csr.DoNonZero(writeNonZero)
+
+		return buf.Flush()
+	}
+
+	// support dense variant later
+	return fmt.Errorf("No output support yet for dense matrices.")
+}

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -448,5 +449,80 @@ func TestParseHREF(t *testing.T) {
 			t.Errorf("Wrong name: exp %#v, got %#v", e.matrix.name, m.name)
 		}
 
+	}
+}
+
+func TestWriteMatrixMarketFormat(t *testing.T) {
+	// expected outcome, after reordering and formatting of output
+	mm := []byte(
+		`%%MatrixMarket matrix coordinate real general
+5 5 8
+1 1 1
+1 4 6
+2 2 10.5
+3 3 0.015
+4 2 250.5
+4 4 -280
+4 5 33.32
+5 5 12
+`)
+
+	// COO representation of the test output matrix
+	ref := sparse.NewCOO(5, 5, make([]int, 8), make([]int, 8), make([]float64, 8))
+	ref.Set(0, 0, 1.0)
+	ref.Set(1, 1, 10.5)
+	ref.Set(3, 1, 250.5)
+	ref.Set(2, 2, 0.015)
+	ref.Set(0, 3, 6.0)
+	ref.Set(3, 3, -280.0)
+	ref.Set(3, 4, 33.32)
+	ref.Set(4, 4, 12.0)
+
+	// create test file
+	f, err := os.Create("test_write.mtx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	// populate with matrix
+	csr := ref.ToCSR()
+	err = SaveToMatrixMarket(csr, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// compare both streams byte wise
+	refReader := bufio.NewReader(bytes.NewBuffer(mm))
+	matReader, err := os.Open("test_write.mtx")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// FIXME: might be much for this simple test
+	for {
+		b1 := make([]byte, 64000)
+		_, err1 := refReader.Read(b1)
+		b2 := make([]byte, 64000)
+		_, err2 := matReader.Read(b2)
+
+		if err1 != nil || err2 != nil {
+			if err1 == io.EOF && err2 == io.EOF {
+				// end of files
+				break
+			} else {
+				t.Logf("error: buffer 1: %v, buffer 2: %v", err1, err2)
+			}
+		}
+
+		if !bytes.Equal(b1, b2) {
+			t.Logf("Reference bytes: %v", b1)
+			t.Logf("Custom bytes: %v", b2)
+			t.Errorf("bytes are not equal")
+		}
+	}
+
+	if err := os.Remove("test_write.mtx"); err != nil {
+		t.Error(err)
 	}
 }
