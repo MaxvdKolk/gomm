@@ -245,7 +245,7 @@ func TestParseMatrixMarketComment(t *testing.T) {
 				comment: "%Hello\n\t\n\n\n%World!",
 			},
 		},
-		entry{ // emtpy line
+		entry{ // empty line
 			str:    []byte(""),
 			matrix: Matrix{},
 		},

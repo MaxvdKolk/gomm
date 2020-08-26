@@ -166,7 +166,7 @@ func (matrix *Matrix) Filename() string {
 	return fmt.Sprintf("%s.mtx.gz", matrix.name)
 }
 
-// Download dowloads the matrix to disk.
+// Download downloads the matrix to disk.
 func (market *MatrixMarket) Download(m Matrix) error {
 	return m.Download()
 }
@@ -308,7 +308,7 @@ func (matrix *Matrix) ParseHeader(buf *bufio.Reader) error {
 	return nil
 }
 
-// ParseComment consumes all comment and/or emtpy lines from the reader. The
+// ParseComment consumes all comment and/or empty lines from the reader. The
 // comments are stored, in case they contain valuable information. EOF is not
 // treated as error, it simply terminates the processing of comments.
 func (matrix *Matrix) ParseComment(buf *bufio.Reader) error {
@@ -436,7 +436,7 @@ func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 	// fill COO
 	n, m := matrix.Dims()
 	if n == 0 || m == 0 {
-		return fmt.Errorf("Matrix dimensions are emtpy (%d, %d)", n, m)
+		return fmt.Errorf("Matrix dimensions are empty (%d, %d)", n, m)
 	}
 
 	// estimate number of non-zeros by number of lines in file
@@ -485,7 +485,7 @@ func (matrix *Matrix) ParseArrayFormat(buf *bufio.Reader) error {
 	// prepare dense matrix
 	n, m := matrix.Dims()
 	if n == 0 || m == 0 {
-		return fmt.Errorf("Matrix dimensions are emtpy (%d, %d)", n, m)
+		return fmt.Errorf("Matrix dimensions are empty (%d, %d)", n, m)
 	}
 
 	//mat := mat.NewDense(n, m, nil)
