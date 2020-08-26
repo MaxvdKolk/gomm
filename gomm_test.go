@@ -13,6 +13,15 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+func Example() {
+	mm, _ := GetMatrix("Harwell-Boeing", "bcsstruc1", "bcsstk01")
+	csr := mm.(*sparse.CSR)
+	n, m := csr.Dims()
+	nnz := csr.NNZ()
+	fmt.Printf("type: %T, (rows,cols): (%d,%d), nnz: %d", csr, n, m, nnz)
+	// Output: type: *sparse.CSR, (rows,cols): (48,48), nnz: 400
+}
+
 type entry struct {
 	str    []byte
 	matrix Matrix
