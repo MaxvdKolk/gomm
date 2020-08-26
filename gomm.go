@@ -18,15 +18,20 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
-const marketUrl string = `http://math.nist.gov/MatrixMarket/matrices.html`
-const ftpDialUrl string = `math.nist.gov`
-const ftpPath string = `pub/MatrixMarket2/%s/%s/%s.%s`
+// MatrixMarket remote URLs and FTP path.
+const (
+	marketUrl  string = `http://math.nist.gov/MatrixMarket/matrices.html`
+	ftpDialUrl string = `math.nist.gov`
+	ftpPath    string = `pub/MatrixMarket2/%s/%s/%s.%s`
+)
 
+// Supported formats for the MatrixMarket matrices.
 const (
 	FormatArray      string = "array"
 	FormatCoordinate string = "coordinate"
 )
 
+// Possible value types for the `MatrixMarket` matrices.
 const (
 	TypeReal    = "real"
 	TypeInteger = "complex"
@@ -34,6 +39,11 @@ const (
 	TypePattern = "pattern"
 )
 
+// Symmetry properties for the `MatrixMarket` matrices. For general matrices all
+// the non-zeroes are provided. For symmetric and skew-symmetric only the
+// lower-triangular (including the diagonal) is given.
+//
+// Note hermitian matrices are not yet supported.
 const (
 	General       = "general"
 	Symmetric     = "symmetric"
@@ -41,10 +51,16 @@ const (
 	Hermitian     = "hermitian"
 )
 
+// MatrixMarket represents the MatrixMarket in the sense that it can hold on
+// to various instances of `MatrixMarket` matrices.
 type MatrixMarket struct {
 	Matrices []Matrix
 }
 
+// Matrix represents a single matrix from the MatrixMarket. The struct contains
+// generic properties obtained by parsing the formats and stores the actual
+// matrix using the `mat.Matrix` interface. This can capture both dense (for
+// `FormatArray`) and sparse (for `FormatCoordinate`) systems.
 type Matrix struct {
 	comment    string
 	collection string
@@ -54,12 +70,22 @@ type Matrix struct {
 	Type       string
 	Symmetry   string
 	n, m       int
-	nnz        int
-	lines      int
+
+	// The number of non-zeroes in the matrix. This differs from `lines` in
+	// the sense that `lines` only provides details on the number of lines
+	// parsed in the formats. For some cases, such as `General` type
+	// matrices without duplicates or `FormatArray` type matrices, both
+	// values might coincide.
+	nnz   int
+	lines int
 
 	mat mat.Matrix
 }
 
+// GetMatrix gets a single matrix from the `MatrixMarket`. The routine requires
+// the collection, set, and name of the matrix and attempts to download and
+// parse the obtained document. On success a `mat.Matrix` interface is returned
+// that either contains a sparse or dense matrix depending on the matrix's type.
 func GetMatrix(collection, set, name string) (mat.Matrix, error) {
 	matrix := NewMatrix(collection, set, name)
 	if err := matrix.Download(); err != nil {
@@ -85,6 +111,8 @@ func GetMatrix(collection, set, name string) (mat.Matrix, error) {
 	return mat, nil
 }
 
+// NewMatrixMarket creates a local representation of the `MatrixMarket`. It
+// forms a list of all available matrices from the `/MatrixMarket/data/` page.
 func NewMatrixMarket() (*MatrixMarket, error) {
 	list, err := GetMatrixMarket()
 	if err != nil {
@@ -111,32 +139,40 @@ func NewMatrixMarket() (*MatrixMarket, error) {
 	return market, nil
 }
 
+// NewMatrix provides a `Matrix` struct initialised with a collection, set, and
+// name.
 func NewMatrix(collection, set, name string) Matrix {
 	return Matrix{collection: collection, set: set, name: name}
 }
 
+// Dims returns the dimensions of the matrix `(rows, cols)`.
 func (matrix *Matrix) Dims() (int, int) {
 	return matrix.n, matrix.m
 }
 
+// At returns the value of the matrix at `(i,j)` using the matrix interface.
 func (matrix *Matrix) At(i, j int) float64 {
 	return matrix.mat.At(i, j)
 }
 
+// NNZ returns the number of non-zeroes of the matrix.
 func (matrix *Matrix) NNZ() int {
 	return matrix.nnz
 }
 
+// Filename forms the filename of the matrix. Currently, the code only processes
+// the `MatrixMarket` format and the extensions are hardcoded to `.mtx.gz`.
 func (matrix *Matrix) Filename() string {
 	return fmt.Sprintf("%s.mtx.gz", matrix.name)
 }
 
+// Download dowloads the matrix to disk.
 func (market *MatrixMarket) Download(m Matrix) error {
 	return m.Download()
 }
 
+// GetMatrixMarket reads the body of the response for a matrix request.
 func GetMatrixMarket() (io.ReadCloser, error) {
-
 	resp, err := http.Get(marketUrl)
 	if err != nil {
 		return nil, err
@@ -144,6 +180,8 @@ func GetMatrixMarket() (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
+// ParseEntry parses a single entry in the list of `MatrixMarket` matrices and
+// forms a new Matrix given the obtained collection, set, and name.
 func ParseEntry(line string) (Matrix, error) {
 	res := strings.Split(strings.Split(line, `"`)[1], "/")
 	if len(res) != 6 {
@@ -160,6 +198,8 @@ func ParseEntry(line string) (Matrix, error) {
 	}, nil
 }
 
+// Download a single matrix to disk. This stores the matrix as a `gz` compressed
+// file.
 func (m *Matrix) Download() error {
 	c, err := ftp.Dial(ftpDialUrl + `:21`)
 	if err != nil {
@@ -188,17 +228,20 @@ func (m *Matrix) Download() error {
 	return err
 }
 
+// Path returns the formatted path of the matrix.
 func (matrix *Matrix) Path() string {
 	// TODO: consider other formats
 	return fmt.Sprintf("%s.mtx.gz", matrix.name)
 }
 
+// String forms a string representation of the matrix.
 func (matrix *Matrix) String() string {
 	format := "Matrix `%s`: format: `%s`, type: `%s`\n"
 	return fmt.Sprintf(format, matrix.name, matrix.Format, matrix.Type)
 }
 
-// TODO maybe just pass the line and not the full buffer?
+// ParseHeader attempts to parse a header of the `MatrixMarket` format. This
+// extracts the first line from the provided `Reader`.
 func (matrix *Matrix) ParseHeader(buf *bufio.Reader) error {
 	// read first line
 	b, err := buf.ReadBytes('\n')
@@ -348,6 +391,9 @@ func (matrix *Matrix) ParseDimensions(buf *bufio.Reader) error {
 	return nil
 }
 
+// ParseMatrix performs the parsing of the body of the matrix. This routine
+// invokes a specialised routine, depending on the matrix format, to perform
+// the actual parsing.
 func (matrix *Matrix) ParseMatrix(buf *bufio.Reader) error {
 	switch matrix.Format {
 	case FormatCoordinate:
@@ -359,6 +405,8 @@ func (matrix *Matrix) ParseMatrix(buf *bufio.Reader) error {
 	}
 }
 
+// splitTriplet splits a COO-triplet of (i, j, v) form from strings to two
+// integer indices (i, j) and the matching floating point value (v).
 func splitTriplet(s string) (i int, j int, v float64, err error) {
 	splits := strings.Fields(strings.TrimSpace(s))
 	if len(splits) != 3 {
@@ -383,6 +431,7 @@ func splitTriplet(s string) (i int, j int, v float64, err error) {
 	return i, j, v, nil
 }
 
+// ParseCoordinate parses a `MatrixMarket` of the `Coordinate` format.
 func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 	// fill COO
 	n, m := matrix.Dims()
@@ -431,6 +480,7 @@ func (matrix *Matrix) ParseCoordinate(buf *bufio.Reader) error {
 	return nil
 }
 
+// ParseArrayFormat parses a `MatrixMarket` of format `Array`.
 func (matrix *Matrix) ParseArrayFormat(buf *bufio.Reader) error {
 	// prepare dense matrix
 	n, m := matrix.Dims()
@@ -467,6 +517,10 @@ func (matrix *Matrix) ParseArrayFormat(buf *bufio.Reader) error {
 	return nil
 }
 
+// Parse parses the matrix form a `Reader` by parsing the header, comment,
+// dimensions, and finally the body of the matrix. The parsed information is
+// stored in the matrix. If all steps complete without error the matrix
+// interface is returned.
 func (matrix *Matrix) Parse(rd io.Reader) (mat.Matrix, error) {
 	buf := bufio.NewReader(rd)
 
