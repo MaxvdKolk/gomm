@@ -151,7 +151,7 @@ func TestParseMatrixMarketCoordinate(t *testing.T) {
 
 func TestParseMatrixMarketDimensions(t *testing.T) {
 	entries := []entry{
-		entry{ // valid
+		{ // valid
 			str: []byte("5 6 7\n"),
 			matrix: Matrix{
 				n:      5,
@@ -160,7 +160,7 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 				Format: FormatCoordinate,
 			},
 		},
-		entry{ // invalid
+		{ // invalid
 			str: []byte("5 6\n"),
 			err: true,
 			matrix: Matrix{
@@ -169,7 +169,7 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 				Format: FormatCoordinate,
 			},
 		},
-		entry{ // valid for `FormatArray`
+		{ // valid for `FormatArray`
 			str: []byte("5 6\n"),
 			matrix: Matrix{
 				n:      5,
@@ -178,7 +178,7 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 				Format: FormatArray,
 			},
 		},
-		entry{ // invalid for `FormatArray`
+		{ // invalid for `FormatArray`
 			str: []byte("5\n"),
 			err: true,
 			matrix: Matrix{
@@ -215,37 +215,37 @@ func TestParseMatrixMarketDimensions(t *testing.T) {
 
 func TestParseMatrixMarketComment(t *testing.T) {
 	entries := []entry{
-		entry{ // valid
+		{ // valid
 			str: []byte("%Hello\n%World!\n10 10 10"),
 			matrix: Matrix{
 				comment: "%Hello\n%World!\n",
 			},
 		},
-		entry{ // no following lines
+		{ // no following lines
 			str: []byte("%Hello\n%World!"),
 			matrix: Matrix{
 				comment: "%Hello\n%World!",
 			},
 		},
-		entry{ // some consequetive newlines
+		{ // some consequetive newlines
 			str: []byte("%Hello\n\n\n\n%World!"),
 			matrix: Matrix{
 				comment: "%Hello\n\n\n\n%World!",
 			},
 		},
-		entry{ // some consequetive newlines with spaces
+		{ // some consequetive newlines with spaces
 			str: []byte("%Hello\n    \n\n\n%World!"),
 			matrix: Matrix{
 				comment: "%Hello\n    \n\n\n%World!",
 			},
 		},
-		entry{ // some consequetive newlines with tabs
+		{ // some consequetive newlines with tabs
 			str: []byte("%Hello\n\t\n\n\n%World!"),
 			matrix: Matrix{
 				comment: "%Hello\n\t\n\n\n%World!",
 			},
 		},
-		entry{ // empty line
+		{ // empty line
 			str:    []byte(""),
 			matrix: Matrix{},
 		},
@@ -267,7 +267,7 @@ func TestParseMatrixMarketHeader(t *testing.T) {
 
 	entries := []entry{
 		// valid headers...
-		entry{
+		{
 			str: []byte("%%MatrixMarket matrix coordinate real general"),
 			matrix: Matrix{
 				Format:   FormatCoordinate,
@@ -275,7 +275,7 @@ func TestParseMatrixMarketHeader(t *testing.T) {
 				Symmetry: General,
 			},
 		},
-		entry{
+		{
 			str: []byte("%%MatrixMarket matrix array pattern general"),
 			matrix: Matrix{
 				Format:   FormatArray,
@@ -283,7 +283,7 @@ func TestParseMatrixMarketHeader(t *testing.T) {
 				Symmetry: General,
 			},
 		},
-		entry{ // lower case %%MatrixMarket should also pass
+		{ // lower case %%MatrixMarket should also pass
 			str: []byte("%%matrixmarket matrix array pattern general"),
 			matrix: Matrix{
 				Format:   FormatArray,
@@ -292,35 +292,35 @@ func TestParseMatrixMarketHeader(t *testing.T) {
 			},
 		},
 		// faulty headers...
-		entry{ // empty header
+		{ // empty header
 			str: []byte(""),
 			err: true,
 		},
-		entry{ // no obj
+		{ // no obj
 			str: []byte("%%MatrixMarket"),
 			err: true,
 		},
-		entry{ // missing '%%MatrixMarket' at beginning
+		{ // missing '%%MatrixMarket' at beginning
 			str: []byte("%MatrixMarket matrix coordinate real general"),
 			err: true,
 		},
-		entry{ // EOF directly
+		{ // EOF directly
 			str: []byte(`%MatrixMarket matrix coordinate real general`),
 			err: true,
 		},
-		entry{ // no 'matrix'
+		{ // no 'matrix'
 			str: []byte("%%MatrixMarket m coordinate real general"),
 			err: true,
 		},
-		entry{ // no 'format'
+		{ // no 'format'
 			str: []byte("%%MatrixMarket m c real general"),
 			err: true,
 		},
-		entry{ // no 'type'
+		{ // no 'type'
 			str: []byte("%%MatrixMarket matrix coordinate r general"),
 			err: true,
 		},
-		entry{ // no 'symmetry'
+		{ // no 'symmetry'
 			str: []byte("%%MatrixMarket matrix coordinate real g"),
 			err: true,
 		},
@@ -365,7 +365,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 
 	// selection of test matrices
 	matrices := []RefMatrix{
-		RefMatrix{ // coordinate real unsymmetric
+		{ // coordinate real unsymmetric
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "lns",
@@ -373,7 +373,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			},
 			131, 131, 536,
 		},
-		RefMatrix{ // coordinate real unsymmetric with explicit zeros
+		{ // coordinate real unsymmetric with explicit zeros
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "nnceng",
@@ -381,7 +381,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			},
 			434, 434, 4182,
 		},
-		RefMatrix{ // coordinate real symmetric positive definite
+		{ // coordinate real symmetric positive definite
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "bcsstruc1",
@@ -389,7 +389,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			},
 			48, 48, 400,
 		},
-		RefMatrix{ // coordinate real skew-symmetric
+		{ // coordinate real skew-symmetric
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "platz",
@@ -397,7 +397,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			},
 			1919, 1919, 9662,
 		},
-		RefMatrix{ // coordinate real unsymmetric, more dense
+		{ // coordinate real unsymmetric, more dense
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "astroph",
@@ -405,7 +405,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			},
 			180, 180, 2659,
 		},
-		RefMatrix{ // coordinate real unsymmetric, nrows > ncols
+		{ // coordinate real unsymmetric, nrows > ncols
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "lsq",
@@ -413,7 +413,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			},
 			1033, 320, 4719,
 		},
-		RefMatrix{ // coordinate real unsymmetric, ncols > nrows
+		{ // coordinate real unsymmetric, ncols > nrows
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "econiea",
@@ -421,7 +421,7 @@ func TestParseMatrixMarketFormat(t *testing.T) {
 			},
 			207, 277, 2909,
 		},
-		RefMatrix{ // coordinate real unsymmetric, ncols > nrows, almost dense
+		{ // coordinate real unsymmetric, ncols > nrows, almost dense
 			Matrix{
 				collection: "Harwell-Boeing",
 				set:        "econiea",
@@ -502,7 +502,7 @@ func TestParseHREF(t *testing.T) {
 	}
 
 	entries := []entry{
-		entry{
+		{
 			str: `<A HREF="/MatrixMarket/data/Harwell-Boeing/smtape/ash608.html">ASH608</A><BR>`,
 			matrix: Matrix{
 				collection: "Harwell-Boeing",
@@ -510,7 +510,7 @@ func TestParseHREF(t *testing.T) {
 				name:       "ash608",
 			},
 		},
-		entry{
+		{
 			str: `<A HREF="/MatrixMarket/data/Harwell-Boeing/smtape/shl____0.html">SHL    0</A><BR>`,
 			matrix: Matrix{
 				collection: "Harwell-Boeing",

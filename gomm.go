@@ -200,7 +200,7 @@ func ParseEntry(line string) (Matrix, error) {
 
 // Download a single matrix to disk. This stores the matrix as a `gz` compressed
 // file.
-func (m *Matrix) Download() error {
+func (matrix *Matrix) Download() error {
 	c, err := ftp.Dial(ftpDialUrl + `:21`)
 	if err != nil {
 		return err
@@ -212,13 +212,13 @@ func (m *Matrix) Download() error {
 	}
 
 	// TODO can be harwell-boeing or matrixmarket format...
-	f, err := c.Retr(fmt.Sprintf(ftpPath, m.collection, m.set, m.name, "mtx.gz"))
+	f, err := c.Retr(fmt.Sprintf(ftpPath, matrix.collection, matrix.set, matrix.name, "mtx.gz"))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	file, err := os.Create(fmt.Sprintf("%s.mtx.gz", m.name))
+	file, err := os.Create(fmt.Sprintf("%s.mtx.gz", matrix.name))
 	if err != nil {
 		return err
 	}
