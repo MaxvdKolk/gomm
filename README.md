@@ -1,4 +1,5 @@
 ![Go](https://github.com/MaxvdKolk/gomm/workflows/Go/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/maxvdkolk/gomm)](https://goreportcard.com/report/github.com/maxvdkolk/gomm)
 # gomm
 `gomm`: a MatrixMarket parser in Go. 
 
