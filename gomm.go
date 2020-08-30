@@ -561,17 +561,24 @@ func SaveToMatrixMarket(matrix mat.Matrix, wr io.Writer) error {
 	if ok {
 		// MatrixMarket header
 		header := fmt.Sprintf("%%%%MatrixMarket matrix %s %s %s\n", FormatCoordinate, TypeReal, General)
-		buf.WriteString(header)
+		if _, err := buf.WriteString(header); err != nil {
+			return err
+		}
 
 		// Matrix dimensions and number of lines of output
 		n, m := csr.Dims()
 		nnz := csr.NNZ()
-		buf.WriteString(fmt.Sprintf("%d %d %d\n", n, m, nnz))
+		if _, err := buf.WriteString(fmt.Sprintf("%d %d %d\n", n, m, nnz)); err != nil {
+			return err
+		}
 
 		// Apply write function to each non-zero
 		writeNonZero := func(i, j int, v float64) {
 			// Correct for one-base
-			buf.WriteString(fmt.Sprintf("%d %d %v\n", i+1, j+1, v))
+			_, err := buf.WriteString(fmt.Sprintf("%d %d %v\n", i+1, j+1, v))
+			if err != nil {
+				fmt.Printf("Error in writing non-zero: %v", err)
+			}
 		}
 		csr.DoNonZero(writeNonZero)
 
@@ -582,15 +589,24 @@ func SaveToMatrixMarket(matrix mat.Matrix, wr io.Writer) error {
 	dense, ok := matrix.(*mat.Dense)
 	if ok {
 		header := fmt.Sprintf("%%%%MatrixMarket matrix %s %s %s\n", FormatArray, TypeReal, General)
-		buf.WriteString(header)
+		_, err := buf.WriteString(header)
+		if err != nil {
+			return err
+		}
 
 		// Matrix dimensions and number of lines of output
 		n, m := dense.Dims()
-		buf.WriteString(fmt.Sprintf("%d %d\n", n, m))
+		_, err = buf.WriteString(fmt.Sprintf("%d %d\n", n, m))
+		if err != nil {
+			return err
+		}
 
 		for c := 0; c < m; c++ {
 			for r := 0; r < n; r++ {
-				buf.WriteString(fmt.Sprintf("%v\n", dense.At(r, c)))
+				_, err = buf.WriteString(fmt.Sprintf("%v\n", dense.At(r, c)))
+				if err != nil {
+					return err
+				}
 			}
 		}
 		return buf.Flush()
